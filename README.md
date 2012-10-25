@@ -52,5 +52,5 @@ Then push the repo to OpenShift
 
 That's it, you can now checkout your application at:
 
-    http://scrummage-$yournamespace.rhcloud.com
+    http://scrummage-$yournamespace.rhcloud.com/icescrum
 
