@@ -1,11 +1,11 @@
 icescrum-openshift-quickstart
 =============================
 
-Running iceScrum on RedHat's OpenShift PaaS
+Running iceScrum on Red Hat's OpenShift PaaS
 ===========================================
 This git repository is a sample DIY application along with the
 "orchestration" bits to help you install and run iceScrum along with Tomcat
-on RedHat's OpenShift PaaS.
+on Red Hat's OpenShift PaaS.
 
 
 Steps to get a iceScrum running on OpenShift
@@ -53,7 +53,16 @@ Then push the repo to OpenShift
 
     git push
 
-That's it, you can now checkout your application at:
+And here's the toughest part, you will have to wait a while for this app to
+startup. Its slow as molasses in January!! So check if it has started by
+tailing the log files on your app's gear.
+
+    ssh $guid@$app-$namespace.rhcloud.com
+    rhcsh$  cd $OPENSHIFT_DATA_DIR/apache-tomcat*/logs
+    rhcsh$  tail -f * logs/*
+
+And check that the iceScrum app has started and then you can
+checkout your application at:
 
     http://scrummage-$yournamespace.rhcloud.com/icescrum
 
