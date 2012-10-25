@@ -31,7 +31,7 @@ Add the mysql-5.1 cartridge to the app
 Add this `github icescrum-openshift-quickstart` repository
 
     cd scrummage
-    git remote add upstream -m master git@github.com:ramr/icescrum-openshift-quickstart.git
+    git remote add upstream -m master git://github.com/ramr/icescrum-openshift-quickstart.git
     git pull -s recursive -X theirs upstream master
 
 If you need to adjust the memory footprint, you can adjust the JVM options
