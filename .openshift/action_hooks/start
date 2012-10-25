@@ -13,5 +13,10 @@ icescrum_java_opts="-Duser.home=$OPENSHIFT_DATA_DIR $cfg_opts"
 #  start tomcat.
 export _JAVA_OPTIONS="-Xmx384m $icescrum_java_opts -Djava.awt.headless=true"
 
+#  Note:  If you use medium/large gears to create the app, you can uncomment
+#         the next line to set more reasonable (for iceScrum) JVM options.
+
+#  export _JAVA_OPTIONS="-Xmx512m -XX:MaxPermSize=256M $icescrum_java_opts -Djava.awt.headless=true"
+
 start_tomcat
 

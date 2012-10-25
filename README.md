@@ -38,8 +38,7 @@ As an example, to use a 512MB heap and perm-generation size of 256M, you can
 modify the options that Tomcat (really the JVM) uses by setting the
 _JAVA_OPTIONS environment variable in `.openshift/action_hooks/start` to:
 
-    export _JAVA_OPTIONS="-Xmx512m -XX:MaxPermSize=256M $icescrum_java_opts  \
-                          -Djava.awt.headless=true"
+    export _JAVA_OPTIONS="-Xmx512m -XX:MaxPermSize=256M $icescrum_java_opts -Djava.awt.headless=true"
 
 
 If you made changes, then commit those changes.
