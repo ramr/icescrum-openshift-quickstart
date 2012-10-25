@@ -1,0 +1,238 @@
+#!/bin/bash
+
+#  Bash utility functions for installing and controlling the icescrum app and
+#  tomcat.
+
+#  Globals.
+TOMCAT_VERSION_MAJOR="7"
+TOMCAT_VERSION_MINOR="0.32"
+TOMCAT_VERSION="${TOMCAT_VERSION_MAJOR}.${TOMCAT_VERSION_MINOR}"
+
+ICESCRUM_WAR_FILE="icescrum_R5_2.3_war"
+ICESCRUM_WEBAPP_CONTEXT="/icescrum"
+ICESCRUM_WEBAPP_CONTEXT_DIR_NAME="icescrum"
+ICESCRUM_WEBAPP_PROPERTIES_FILE="icescrum-webapp-config.properties"
+
+
+#
+# Utility functions.
+#
+
+function _get_tomcat_install_dir() {
+   tc_dir_name="apache-tomcat-$TOMCAT_VERSION"
+   echo "$OPENSHIFT_DATA_DIR/$tc_dir_name"
+
+}  #  End of function  _get_tomcat_install_dir.
+
+
+function _get_tomcat_download_uri() {
+   tc_zip="apache-tomcat-${TOMCAT_VERSION}.zip"
+   zpath="/tomcat/tomcat-${TOMCAT_VERSION_MAJOR}/v${TOMCAT_VERSION}/bin/$tc_zip"
+   echo "http://apache.mirrors.hoobly.com${zpath}"
+
+}  #  End of function  _get_tomcat_download_uri.
+
+
+function _fixup_tomcat_server_xml() {
+   cfg_dir="$(_get_tomcat_install_dir)/conf"
+   gip="$OPENSHIFT_INTERNAL_IP"
+   # gdns="$OPENSHIFT_GEAR_DNS"
+
+   sed "s#\(\s*\)port=\([^ ]*\)\s*#\1address=\"$gip\" port=\2 #g;            \
+        s#port=\"\(8005\|8009\|8443\)\"#port=\"1\1\"#g;                      \
+        s#redirectPort=\"\(8443\)\"#redirectPort=\"1\1\"#g;                  \
+        s#defaultHost=\(\"[^\"]*\"\)#defaultHost=\"$gip\"#g;                 \
+        s#<Host\s*\([^ ]*\)\s*name=\(\"[^\"]*\"\)#<Host \1 name=\"$gip\"#g;  \
+       "  "$cfg_dir/server.xml.default" > "$cfg_dir/server.xml"
+   echo "  -  Fixed up Tomcat config file"
+
+}  #  End of function  _fixup_tomcat_server_xml.
+
+
+function _create_icescrum_config_properties() {
+   app_name="$OPENSHIFT_APP_NAME"
+   cfg_props=$(get_icescrum_config_properties_file)
+   mysql_ip=${OPENSHIFT_MYSQL_DB_HOST:-"$OPENSHIFT_DB_HOST"}
+   mysql_port=${OPENSHIFT_MYSQL_DB_PORT:-"$OPENSHIFT_DB_PORT"}
+   mysql_user=${OPENSHIFT_MYSQL_DB_USERNAME:-"$OPENSHIFT_DB_USERNAME"}
+   mysql_password=${OPENSHIFT_MYSQL_DB_PASSWORD:-"$OPENSHIFT_DB_PASSWORD"}
+
+   cat > "$cfg_props" <<CFG_EOF
+#  `date`: Added IceScrum configuration.
+dataSource.driverClassName=com.mysql.jdbc.Driver
+dataSource.dialect=org.hibernate.dialect.MySQL5InnoDBDialect
+dataSource.url=jdbc:mysql://${mysql_ip}:${mysql_port}/${app_name}?useUnicode=true&characterEncoding=utf8&autoReconnect=true
+dataSource.username=$mysql_user
+dataSource.password=$mysql_password
+dataSource.dbCreate=update
+
+icescrum.login.retrieve.enable = true
+
+grails.serverURL=http://$OPENSHIFT_APP_DNS/icescrum
+CFG_EOF
+
+   echo "  -  Created IceScrum config properties"
+
+}  #  End of function  _create_icescrum_config_properties.
+
+
+function _get_mysql_java_connector_zipfile() {
+   icescrum_lib_dir="$(_get_tomcat_install_dir)/webapps/icescrum/WEB-INF/lib"
+
+   ls $icescrum_lib_dir/mysql-connector-java*.jar | head -n 1
+
+}  #  End of function  _get_mysql_java_connector_zipfile.
+
+
+function _control_tomcat() {
+   is_tomcat_installed  ||  return 0
+
+   tc_install_dir=$(_get_tomcat_install_dir)
+
+   pushd "$tc_install_dir/logs"  > /dev/null
+
+   case "$1" in 
+      start)   $tc_install_dir/bin/startup.sh             ;; 
+      stop)    $tc_install_dir/bin/shutdown.sh            ;;
+      *)       echo "Usage: control_tomcat {start|stop}"  ;;
+   esac
+
+   popd > /dev/null
+
+}  #  End of function  control_tomcat.
+
+
+
+#
+#  Externally used functions.
+#
+function is_tomcat_installed() {
+   tc_install_dir=$(_get_tomcat_install_dir)
+   [ -d "$tc_install_dir" ]  &&  return 0
+
+   return 1
+
+}  #  End of function  is_tomcat_installed.
+
+
+function check_mysql_added_to_app() {
+   mysql_host=${OPENSHIFT_DB_HOST:-"$OPENSHIFT_MYSQL_DB_HOST"}
+   [ -n "$mysql_host" ]  &&  return 0
+
+   mysql_add_cmd="rhc app cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1"
+   echo
+   echo "  ***Error:  MySQL has NOT been added to this application. Use: "
+   echo "                $mysql_add_cmd"
+   echo "             to add mysql-5.1 to your application and then push"
+   echo "             changes to this application."
+   echo
+
+   return 1
+
+}  #  End of function  check_mysql_added_to_app.
+
+
+function download_and_install_tomcat() {
+   download_uri=$(_get_tomcat_download_uri)
+   tc_install_dir=$(_get_tomcat_install_dir)
+   tc_zipfile=$(basename "$download_uri")
+
+   # Check if we already downloaded and installed Tomcat.
+   is_tomcat_installed  &&  return 0
+
+   pushd "$OPENSHIFT_DATA_DIR" > /dev/null
+
+   #  Get the tomcat zip file and extact it.
+   echo "  -  Downloading Tomcat $TOMCAT_VERSION ... "
+   wget -nv "$download_uri"
+   echo "  -  Unzipping ... "
+   unzip_dir=$(dirname "$tc_install_dir")
+   unzip -qq "$tc_zipfile" -d "$unzip_dir"  &&  rm -f "$tc_zipfile"
+
+   #  Move the ROOT webapp out, save the default server.xml file and make
+   #  executable the shell scripts in the bin/ directory.
+   echo "  -  Installing ... "
+   webapps_dir="$tc_install_dir/webapps"
+   mv "$webapps_dir/ROOT" "$webapps_dir/tomcat-ROOT"
+
+   cfg_dir="$tc_install_dir/conf"
+   mkdir -p "$cfg_dir/Catalina/$OPENSHIFT_INTERNAL_IP"
+   cp "$cfg_dir/server.xml" "$cfg_dir/server.xml.default"
+
+   chmod +x $tc_install_dir/bin/*.sh
+
+   #  Fixup tomcat server.xml
+   _fixup_tomcat_server_xml
+
+   popd > /dev/null
+   echo "  -  Extracted Tomcat $TOMCAT_VERSION"
+
+}  #  End of function  download_and_install_tomcat.
+
+
+function get_icescrum_config_properties_file() {
+   echo "$OPENSHIFT_DATA_DIR/$ICESCRUM_WEBAPP_PROPERTIES_FILE"
+
+}  #  End of function  get_icescrum_config_properties_file.
+
+
+function download_and_install_icescrum() {
+   tc_install_dir=$(_get_tomcat_install_dir)
+
+   pushd "$OPENSHIFT_DATA_DIR" > /dev/null
+
+   rm -f ${ICESCRUM_WAR_FILE}.zip icescrum.war
+
+   #  Get the icescrum war file.
+   echo "  -  Downloading icescrum ... "
+   wget -nv "http://www.icescrum.org/downloads/${ICESCRUM_WAR_FILE}.zip"
+
+   #  Extract the icescrum.war file.
+   echo "  -  Extracting icescrum ... "
+   unzip -qq "${ICESCRUM_WAR_FILE}.zip"  &&  rm -f "${ICESCRUM_WAR_FILE}.zip"
+
+   #  Remove old context directory and recreate it.
+   echo "  -  Installing icescrum ... "
+   cd "$tc_install_dir/webapps"
+   rm -f ${ICESCRUM_WEBAPP_CONTEXT_DIR_NAME:-"icescrum"} icescrum.war
+   mkdir -p "$tc_install_dir/webapps/icescrum"
+   cd "$tc_install_dir/webapps/icescrum"
+   jar -xf "$OPENSHIFT_DATA_DIR/icescrum.war"
+
+   echo "  -  Done installing icescrum.war"
+
+   #  Create IceScrum config properties.
+   _create_icescrum_config_properties
+
+   popd > /dev/null
+   echo "  -  Install IceScrum application - $ICESCRUM_WAR_FILE"
+
+}  #  End of function  download_and_install_icescrum.
+
+
+function set_custom_env_for_tomcat() {
+   tc_install_dir=$(_get_tomcat_install_dir)
+
+   #  Set classpath to contain mysql java connector.
+   mjc_zipf=$(_get_mysql_java_connector_zipfile)
+   echo "CLASSPATH='$mjc_zipf:./'" >>  "$tc_install_dir/bin/setenv.sh"
+
+}  #  End of function  set_custom_env_for_tomcat.
+
+
+
+function start_tomcat() {
+   _control_tomcat "start"
+
+}  #  End of function  start_tomcat.
+
+
+function stop_tomcat() {
+   _control_tomcat "stop"
+
+}  #  End of function  stop_tomcat.
+
+
+
+#
+#  EOF

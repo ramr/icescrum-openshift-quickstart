@@ -1,0 +1,17 @@
+#!/bin/bash
+# This is a simple script and will be executed on your CI system if 
+# available.  Otherwise it will execute while your application is stopped
+# before the build step.  This script gets executed directly, so it
+# could be python, php, ruby, etc.
+
+source "$OPENSHIFT_REPO_DIR/.openshift/lib/utils"
+
+# Check if mysql has been added. 
+check_mysql_added_to_app  ||  exit 2  # ENOENT
+
+if ! is_tomcat_installed; then
+   download_and_install_tomcat
+   download_and_install_icescrum
+   set_custom_env_for_tomcat
+fi
+

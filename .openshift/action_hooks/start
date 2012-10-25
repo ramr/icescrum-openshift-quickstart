@@ -1,0 +1,17 @@
+#!/bin/bash
+# The logic to start up your application should be put in this
+# script. The application will work only if it binds to
+
+source "$OPENSHIFT_REPO_DIR/.openshift/lib/utils"
+
+#  IceScrum needs write permissions to user.home - so set it to the
+#  OPENSHIFT_DATA_DIR and set the config file location.
+cfg_opts="-Dicescrum_config_location=$(get_icescrum_config_properties_file)"
+icescrum_java_opts="-Duser.home=$OPENSHIFT_DATA_DIR $cfg_opts"
+
+#  Adjust heap size to fit gear constraints (default heap size is 1 GB) and
+#  start tomcat.
+export _JAVA_OPTIONS="-Xmx384m $icescrum_java_opts -Djava.awt.headless=true"
+
+start_tomcat
+
