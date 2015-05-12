@@ -35,7 +35,7 @@ function _get_tomcat_download_uri() {
 
 function _fixup_tomcat_server_xml() {
    cfg_dir="$(_get_tomcat_install_dir)/conf"
-   gip="$OPENSHIFT_INTERNAL_IP"
+   gip="$OPENSHIFT_DIY_IP"
    # gdns="$OPENSHIFT_GEAR_DNS"
 
    sed "s#\(\s*\)port=\([^ ]*\)\s*#\1address=\"$gip\" port=\2 #g;            \
@@ -116,7 +116,7 @@ function is_tomcat_installed() {
 
 
 function check_mysql_added_to_app() {
-   mysql_host=${OPENSHIFT_DB_HOST:-"$OPENSHIFT_MYSQL_DB_HOST"}
+   mysql_host=${OPENSHIFT_MYSQL_DB_HOST:-"$OPENSHIFT_DB_HOST"}
    [ -n "$mysql_host" ]  &&  return 0
 
    mysql_add_cmd="rhc app cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1"
@@ -156,7 +156,7 @@ function download_and_install_tomcat() {
    mv "$webapps_dir/ROOT" "$webapps_dir/tomcat-ROOT"
 
    cfg_dir="$tc_install_dir/conf"
-   mkdir -p "$cfg_dir/Catalina/$OPENSHIFT_INTERNAL_IP"
+   mkdir -p "$cfg_dir/Catalina/$OPENSHIFT_DIY_IP"
    cp "$cfg_dir/server.xml" "$cfg_dir/server.xml.default"
 
    chmod +x $tc_install_dir/bin/*.sh
