@@ -26,7 +26,7 @@ Create a diy-0.1 application (you can name it anything via -a)
 
 Add the mysql-5.1 cartridge to the app
 
-    rhc app cartridge add -a scrummage -c mysql-5.1
+    rhc cartridge add -a scrummage -c mysql-5.1
 
 Add this `github icescrum-openshift-quickstart` repository
 
